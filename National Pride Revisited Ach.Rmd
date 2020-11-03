@@ -1,0 +1,1115 @@
+---
+title: "National Pride Revisited"
+author: "Ian Scot Nesbitt, M.A."
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r Libraries}
+library(tidyverse)
+library(lmSupport)
+library(countrycode)
+library(stringr)
+library(psych)
+library(GPArotation)
+library(lme4)
+library(lm.beta)
+library(stargazer)
+library(xtable)
+
+#Uninstall lmerTest due to incompatibilty with stargazer
+#detach("package:lmerTest", unload = TRUE)
+```
+
+```{r Read National Identity Data (raw data is exported from STATA 14 .dta format into a .csv format)}
+d <- read.csv("/Users/ianscotnesbitt/Documents/ISN Data/ISSP raw data.csv")
+# link to raw data for download: https://www.gesis.org/issp/modules/issp-modules-by-topic/national-identity/2013/
+```
+
+```{r Country Codes}
+# Relabeling countries according to their ISO 3 character code.
+d$country <- as.factor(countrycode(d$V4, origin = 'iso3n', destination = 'iso3c'))
+
+# Relabeling the variable that distinguishes key regions within countries, like East and West Germany.
+d$country.region <- d$C_ALPHAN
+
+# Checking that country codes have been matched correctly.
+unique(d[, c("V4", "country", "country.region")])
+# Recoding is correct.
+```
+
+```{r National Pride Item Recoding}
+# Creating dependent variables for each of the 12 pride items.
+d$pride.overall <- d$V58                # Overall National Pride
+d$pride.internationalsports <- d$V22    # Pride in International Sports
+d$pride.democracy <- d$V25              # Pride in Democracy
+d$pride.influence <- d$V26              # Pride in Level of Global Influence
+d$pride.economy <- d$V27                # Pride in Economic Achievements
+d$pride.welfare <- d$V28                # Pride in Welfare State  
+d$pride.science <- d$V29                # Pride in Scientific and Technological Achievements
+d$pride.sports <- d$V30                 # Pride in Sports
+d$pride.arts <- d$V31                   # Pride in Arts
+d$pride.military <- d$V32               # Pride in Military
+d$pride.history <- d$V33                # Pride in History
+d$pride.fairness <- d$V34               # Pride in Level of Fair Treatment of all Groups in Society
+
+# Survey Labels:
+# Very proud = 1
+# Somewhat proud = 2
+# Not very proud = 3
+# Not proud at all = 4
+
+# Recoding pride items on a 0 to 100 scale.
+d <- d %>%
+  mutate_at(
+    c(
+    "pride.overall",
+    "pride.democracy",
+    "pride.influence",
+    "pride.economy",
+    "pride.welfare",
+    "pride.science",
+    "pride.sports",
+    "pride.arts",
+    "pride.military",
+    "pride.history",
+    "pride.fairness"
+      ),
+    funs(
+      recode(.,
+             '1'=100,
+             '2'=67,
+             '3'=33,
+             '4'=0))) %>% mutate_at(
+               c(    "pride.overall",
+                     "pride.democracy",
+                     "pride.influence",
+                     "pride.economy",
+                     "pride.welfare",
+                     "pride.science",
+                     "pride.sports",
+                     "pride.arts",
+                     "pride.military",
+                     "pride.history",
+                     "pride.fairness"),
+               funs(recode(.,
+             '1'=100,
+             '2'=67,
+             '3'=33,
+             '4'=0)))
+             
+
+
+# Survey Labels:
+# Agree strongly = 1
+# Agree = 2
+# Neither agree nor disagree = 3
+# Disagree = 4
+# Disagree strongly = 5
+
+# Recoding of pride in international sports due to the item having a different initial scale. 
+d$pride.internationalsports <- recode(d$pride.internationalsports,
+                                      '1'=100,
+                                      '2'=75,
+                                      '3'=50,
+                                      '4'=25,
+                                      '5'=0
+                                      )
+
+# Checking that pride items are correctly recoded in terms of values and class.
+table(d$pride.overall, d$V58)
+str(d$pNatlQ)
+# Recoding is correct
+
+table(d$pride.internationalsports, d$V22)
+str(d$pride.internationalsports)
+# Recoding is correct
+
+table(d$pride.democracy, d$V25)
+str(d$pride.democracy)
+# Recoding is correct
+
+table(d$pride.influence, d$V26)
+str(d$pride.influence)
+# Recoding is correct
+
+table(d$pride.economy, d$V27)
+str(d$pride.economy)
+# Recoding is correct
+
+table(d$pride.welfare, d$V28)
+str(d$pride.welfare)
+# Recoding is correct
+
+table(d$pride.science, d$V29)
+str(d$pride.science)
+# Recoding is correct
+
+table(d$pride.sports, d$V30)
+str(d$pride.sports)
+# Recoding is correct
+
+table(d$pride.arts, d$V31)
+str(d$pride.arts)
+# Recoding is correct
+
+table(d$pride.military, d$V32)
+str(d$pride.military)
+# Recoding is correct
+
+table(d$pride.history, d$V33)
+str(d$pride.history)
+# Recoding is correct
+
+table(d$pride.fairness, d$V34)
+str(d$pride.fairness)
+# Recoding is correct
+```
+
+```{r Sex}
+# Recoding and refactoring sex.
+
+# Survey Labels:
+# Male = 1
+# Female = 2
+
+d$sex <- recode(d$SEX,
+                  '1'="Male",
+                  '2'="Female")
+
+d$sex <- as.factor(d$sex)
+
+# Checking that sex is recoded correctly in terms of values and class.
+table(d$sex, d$SEX)
+str(d$sex)
+# Recoding is correct
+```
+
+```{r Citizenship}
+# Recoding citizenship status.
+
+# Survey Labels:
+# Yes = 1
+# No = 2
+
+d$citizenship <- recode(d$V63, 
+                     '1'="Citizen", 
+                     '2'="Non-Citizen"
+                     )
+d$citizenship <- as.factor(d$citizenship)
+
+# Checking that citizenship is recoded correctly in terms of values and class.
+table(d$citizenship, d$V63)
+str(d$citizenship)
+# Recoding is correct
+```
+
+```{r Rurality}
+# Recoding place of living as urban = 0 and rural = 1.
+
+# Survey Labels:
+# A big city = 1 
+# The suburbs or outskirts of a big city = 2
+# A town or a small city = 3
+# A country village = 4
+# A farm or home in the country = 5
+
+d$community <- recode(d$URBRURAL, 
+                   '1'="Big City", 
+                   '2'="Suburbs", 
+                   '3'="Town",
+                   '4'="Village", 
+                   '5'="Country"
+                   )
+d$community <- as.factor(d$community)
+
+# Checking that rurality is recoded correctly in terms of values and class.
+table(d$community, d$URBRURAL)
+str(d$community)
+# Recoding is correct
+```
+
+```{r Education}
+# Recoding years of education. 95 is still in HS, 96 is still in college. 
+d$EDUCYRS <- as.numeric(d$EDUCYRS)
+d$education <- recode(d$EDUCYRS, 
+                   '95'=11, 
+                   '96'=14
+                   )
+
+# Recoding values of years of education greater than 25 to NA.
+d$education <- ifelse(d$education < 26, d$education, NA)
+
+# Histogram of years of education.
+hist.education <- ggplot(d, aes(x=education)) + 
+  geom_histogram(color="black",
+                 fill="blue",
+                 na.rm=TRUE, 
+                 binwidth=2) +
+  labs(title="Histogram of Years of Education",
+       x="Years", 
+       y="Number of Respondents") +
+  theme_dark()
+hist.education
+```
+###NOTE: Need to improve imputation of 95 (still in HS) and 96 (still in college) -- consider using age and highest degree to pick a more accurate number.
+```{r Age}
+# Recoding of Age to include only adults.
+d$AGE <- as.numeric(d$AGE)
+d$age <- ifelse(d$AGE >= 18 & d$AGE < 999, d$AGE, NA)
+
+# Creating quadratically transformed age variable.
+d$age.quadratic <- (d$age)^2
+
+# Creating Age variable for participants between 18 and 75 years old.
+d$age.lessthan75 <- ifelse(d$age > 75, NA, d$age)
+
+# 2013 Age of respondents who were born at the time communism fell.
+d$age.born1989 <- as.factor(ifelse(d$age > 24, "Born Before Fall", "Born After Fall"))
+d$age.born1989 <- fct_relevel(d$age.born1989, "Born Before Fall")
+
+# 2013 Age of respondents who were 18 at the time communism fell.
+d$age.adult1989 <- as.factor(ifelse(d$age > 42, "Adult Before Fall", "Adult After Fall"))
+d$age.adult1989 <- fct_relevel(d$age.adult1989, "Adult Before Fall")
+
+# Histogram of Age
+hist.age <- ggplot(d, aes(x=age)) + 
+  geom_histogram(color="black",
+                 fill="red",
+                 na.rm=TRUE, 
+                 binwidth=5) +
+  labs(title="Histogram of Age",
+       x="Pride (0-100)", 
+       y="Number of Respondents") +
+  theme_dark()
+hist.age
+```
+
+```{r Religiosity}
+# Recoding religious attendance to reflect amount of times one attends per year.
+
+# Survey Labels:
+# Several times a week or more often = 8 
+# Once a week = 7 
+# 2 or 3 times a month = 6
+# Once a month  = 5
+# Several times a year = 4 
+# Once a year = 3
+# Less frequently than once a year = 2
+# Never = 1
+
+d$attend.religious <- recode(d$ATTEND,
+                             '8'=100,
+                             '7'=50,
+                             '6'=30,
+                             '5'=12,
+                             '4'=6,
+                             '3'=1,
+                             '2'=.5,
+                             '1'=.01
+                             )
+
+d$attend.religious <- as.numeric(d$attend.religious)
+
+# Histogram of Religiosity
+hist.attend.religious <- ggplot(d, aes(x=attend.religious)) + 
+  geom_histogram(color="black",
+                 fill="yellow",
+                 na.rm=TRUE, 
+                 binwidth=15) +
+  labs(title="Histogram of Yearly Religious Attendance",
+       x="Attendances (0-100)", 
+       y="Number of Respondents") +
+  theme_dark()
+hist.attend.religious
+```
+
+```{r Ex-Communist Countries and Regions}
+# Creating a dummy variable to represent whether a country has a communist history or not.
+
+# List of Ex-Communist countries:
+# Czech Republic
+# East Germany
+# Estonia
+# Georgia
+# Croatia
+# Hungary
+# Lithuania
+# Latvia
+# Russia
+# Slovenia
+# Slovakia
+
+
+d$economic.system <- ifelse(
+    d$country.region == "CZ"|
+    d$country.region == "DE-E"| 
+    d$country.region == "EE"|
+    d$country.region == "GE"|
+    d$country.region == "HR"|
+    d$country.region == "HU"|
+    d$country.region == "LT"|
+    d$country.region == "LV"|
+    d$country.region == "RU"|
+    d$country.region == "SI"|
+    d$country.region == "SK",
+    "Communist",
+    "Market"
+    )
+d$economic.system <- as.factor(d$economic.system)
+
+# Checking that ex-communist societies are correctly coded in terms of values and class.
+xt.econ.system <- unique(subset(d, select = c("country.region", "economic.system")))
+xt.econ.system
+# Recoding is correct.
+```
+
+```{r Nordic Countries}
+# Creating a dummy variable to represent whether a country is Nordic or not.
+
+# List of Nordic countries:
+# Denmark
+# Finland
+# Iceland
+# Norway
+# Sweden
+
+d$nordic <- d$country.region
+d$nordic <- ifelse(
+    d$country.region == "DK"|
+    d$country.region == "FI"|
+    d$country.region == "IS"|
+    d$country.region == "NO"|
+    d$country.region == "SE",
+    "Nordic",
+    "Non-Nordic"
+    )
+d$nordic <- as.factor(d$nordic)
+
+# Checking that Nordic societies are correctly coded in terms of values and class.
+xt.nordic <- unique(subset(d, select = c("country.region", "nordic")))
+xt.nordic
+# Coding is correct.
+```
+
+```{r Read 2013 GDP Per Capita and Population Data}
+IMFd <- read.csv("/Users/ianscotnesbitt/Documents/ISN Data/IMF raw data.csv", stringsAsFactors = FALSE)
+# Download link to raw GDP Per Capita data: https://www.imf.org/external/pubs/ft/weo/2018/02/weodata/index.aspx
+
+# Steps to download GDP per capita and population data from the International Monetary Fund:
+
+# Select "By Countries (country-level data)"
+# 1. Select "All countries."
+# 2. Select "Continue."
+# 3. Select "Gross domestic product, current prices - Purchasing power parity; international dollars."
+# 3. Select "Population."
+# 4. Select 2013 for "Start Year" and "End Year."
+# 4. Select "ISO Alpha-3 Code" and "Subject Descriptor" for "Fields to show on report." 
+# 4. Leave all other default options, e.g. decimal formatting.
+# 4. Select "Prepare Report"
+# 5. Navigate to the bottom of the page and download Microsoft Excel file with IMF data.
+```
+
+```{r Cleaning IMF Data}
+# Removing extra rows that only contain an auto-inserted description of the data from IMF.
+IMFd <- IMFd[-c(389, 390),]
+
+# Concatenating the units and scales so that they do not get lost in translation during data transposition.
+IMFd$UnitScale <- paste0(IMFd$Units, IMFd$Scale)
+
+# Reducing data to necessary columns.
+IMFd <- IMFd[, c("ISO", "UnitScale", "X2013")]
+
+# Transposing data from long to wide form.
+IMFd <- spread(IMFd, UnitScale, X2013)
+
+# Renaming columns containing GDP per capita and population data.
+names(IMFd)[2:3] <- c("population.millions", "gdp.ppp")
+```
+
+```{r GDP per Capita at Purchasing Power Parity}
+# Matching GDP per capita data to appropriate countries in original national identity data.
+d$gdp <- IMFd$gdp.ppp[match(d$country, IMFd$ISO)]
+
+# Recoding GDP per capita data into correct class.
+d$gdp <- as.numeric(gsub(",", "", d$gdp))
+
+# Checking that GDP per capita data is matched to the appropriate countries.
+unique(d[, c("country", "gdp")])
+# Matching is correct.
+
+# Dividing GDP per capita by 1000 so that regression estimates are more meaningful.
+d$gdp.1k <- d$gdp/1000
+```
+
+```{r Population in millions of people}
+# Matching population data to appropriate countries in original national identity data.
+d$population <- IMFd$population.millions[match(d$country, IMFd$ISO)]
+
+# Recoding population data into correct class.
+d$population <- as.numeric(gsub(",", "", d$population))
+
+# Checking that population data is matched to the appropriate countries.
+unique(d[, c("country", "population")])
+#Matching is correct.
+
+# Creating logarithmically transformed population variable.
+d$population.log <- log10(d$population)
+
+# Creating quadratically transformed population variable.
+d$population.quadratic <- (d$population)^2
+```
+
+```{r Pre-factor analysis correlations}
+# Generating correlations among pride items and other criterion variables to see what items might work together in scales.
+# Items should be correlated together, and should have similar correlations with other variables to be considered for items.
+
+# Correlations among the pride items.
+PRIDEd <- subset(d, select=c(pride.overall:pride.fairness))
+cor.pride <- round(cor(PRIDEd, use = "complete.obs"),3)
+cor.pride[upper.tri(cor.pride)] <- ""
+cor.pride <- as.data.frame(cor.pride)
+cor.pride
+
+# Write out for inclusion in the paper.
+#write.table(cor.pride, "/Users/ianscotnesbitt/Desktop/National Pride Project/Excel Files/Tables/Pride Correlations.csv", sep = ",", row.names = TRUE, col.names = TRUE)
+
+# Correlations among the pride items and years of education.
+EDd <- subset(d, select=c(pride.overall:pride.fairness, education))
+cor.ed <- round(cor(EDd, use = "complete.obs"),3)
+cor.ed[upper.tri(cor.ed)] <- ""
+cor.ed <- as.data.frame(cor.ed)
+cor.ed
+
+# Correlations among the pride items and church attendance.
+RELIGIONd <- subset(d, select=c(pride.overall:pride.fairness, attend.religious))
+cor.reli <- round(cor(RELIGIONd, use = "complete.obs"),3)
+cor.reli[upper.tri(cor.reli)] <- ""
+cor.reli <- as.data.frame(cor.reli)
+cor.reli
+
+# Correlations among the pride items and age.
+AGEd <- subset(d, select=c(pride.overall:pride.fairness, age))
+cor.age <- round(cor(AGEd, use = "complete.obs"),3)
+cor.age[upper.tri(cor.age)] <- ""
+cor.age <- as.data.frame(cor.age)
+cor.age
+```
+
+```{r National Pride Item Factor Analysis}
+# Dataframe for factor analysis of pride items that does NOT include pNatlQ, overall national pride.
+PRIDEd2 <- subset(PRIDEd, select=c(pride.internationalsports:pride.fairness))
+
+# Generating scree plot and suggested nunber of factors.
+parallel <- fa.parallel(PRIDEd2, fm = 'ml', fa = 'fa')
+
+# Factor analysis with 4 factors, varimax rotation, and maximum liklihood factor extraction method.
+PRIDE.fa <- fa(PRIDEd2, nfactors = 2, rotate = "varimax", fm="ml")
+PRIDE.fa
+
+PRIDEd2 %>% head(., 50) %>% View
+
+# Write out for inclusion in the paper.
+#write.table(round(loadings(PRIDE.fa),3), "/Users/ianscotnesbitt/Desktop/National Pride Project/Excel Files/Tables/Pride Factor Analysis.csv", sep = ",", row.names = TRUE, col.names = TRUE)
+```
+###INTERPRETATION: The above factor analysis suggests that pride.democracy, pride.economy, pride.influence, pride.welfare, could form a scale related to advancement/development, and that pride.arts and pride.sports could form another related to leisure/recreation. Next, I will see how these items are correlated with other variables. They should all have very similar correlations with the other variables if they are measuring the same construct. 
+```{r Post-Factor Analysis Correlations - Advancement Items}
+# Testing correlations of pride.democracy, pride.economy, pride.influence and pride.welfare with other criterion variables.
+ADVANCEMENTd <- subset(d,
+                       select=c(pride.democracy,
+                                pride.economy,
+                                pride.influence,
+                                pride.welfare,
+                                education,
+                                age,
+                                attend.religious,
+                                gdp,
+                                population
+                                )
+                       )
+
+cor.adv <- round(cor(ADVANCEMENTd, use = "complete.obs"),3)
+cor.adv[upper.tri(cor.adv)] <- ""
+cor.adv <- as.data.frame(cor.adv)
+cor.adv
+
+# Get omega
+alpha.adv <- omega(ADVANCEMENTd[,c("pride.democracy", "pride.economy", "pride.welfare")])
+alpha.adv
+```
+###INTERPRETATION: based on this correlation table, I feel confident to include pride.democracy, pride.economy and pride.welfare in a scale, but pride.influence deviates a bit too much and does not offer quite as much face validity.
+```{r Pride in Advancement Scale}
+# Creating scale for pride in country's advancement/development
+d$pride.advancement <- (d$pride.democracy + d$pride.economy + d$pride.welfare)/3
+
+# Histogram of pAdvQ
+hist.advancement <- ggplot(d, aes(x=pride.advancement)) + 
+  geom_histogram(color="black",
+                 fill="orange",
+                 na.rm=TRUE, 
+                 binwidth=11) +
+  labs(title="Histogram of Pride in Country's Advancement",
+       x="Pride (0-100)", 
+       y="Number of Respondents") +
+  theme_dark()
+hist.advancement
+```
+
+```{r Post-Factor Analysis Correlations - Leisure Items}
+# Testing correlations of pArtsQ and pSportQ with other criterion variables.
+LEISUREd <- subset(d,
+                    select=c(pride.arts,
+                             pride.sports,
+                             education,
+                             age,
+                             attend.religious,
+                             gdp,
+                             population
+                                )
+                       )
+
+cor.leis <- round(cor(LEISUREd, use = "complete.obs"),3)
+cor.leis[upper.tri(cor.leis)] <- ""
+cor.leis <- as.data.frame(cor.leis)
+cor.leis
+```
+###INTERPRETATION: Based on my factor analysis, pArtsQ and pSportQ load heavily onto factor 2.The above correlation table also reveals that they share very similar correlations with a range of other criterion variables, so I am comfortable making a scale with them, despite only having two items.
+```{r Pride in Leisure Activities Scale}
+# Creating scale for pride in country's leisure/recreation.
+d$pride.leisure <- (d$pride.arts + d$pride.sports)/2
+
+# Histogram of pLeisQ
+hist.leisure <- ggplot(d, aes(x=pride.leisure)) +
+  geom_histogram(color="black",
+                 fill="green",
+                 na.rm=TRUE,
+                 binwidth=12) +
+  labs(title="Histogram of Pride in Country's Leisure Activities",
+       x="Pride (0-100)",
+       y="Number of Respondents") +
+  theme_dark()
+hist.leisure
+```
+
+```{r Means and SDs of Overall National Pride, Pride in Advancement, and Pride in Leisure Activities by Country}
+descriptives.dvs <- d %>%
+  group_by(country) %>%
+  summarize_at(vars("pride.overall",
+                    "pride.advancement",
+                    "pride.leisure"),
+               funs(mean(., na.rm=TRUE),
+                    sd(., na.rm=TRUE))) %>%
+  rename("Country" = country,
+         "Overall Pride Mean" = pride.overall_mean,
+         "Pride in Advancement Mean" = pride.advancement_mean,
+         "Pride in Leisure Mean" = pride.leisure_mean,
+         "Overall Pride SD" = pride.overall_sd,
+         "Pride in Advancement SD" = pride.advancement_sd,
+         "Pride in Leisure SD" = pride.leisure_sd) %>% 
+  select("Country",
+         "Overall Pride Mean",
+         "Overall Pride SD",
+         "Pride in Advancement Mean",
+         "Pride in Advancement SD",
+         "Pride in Leisure Mean",
+         "Pride in Leisure SD") %>% 
+  mutate_if(is.numeric, round, 3)
+
+# Write out the table for inclusion in the paper.
+#write.table(descriptives.dvs, "/Users/ianscotnesbitt/Desktop/National Identity/Excel Files/Tables/Outcome Variable Descriptives by Country.csv", sep = ",", row.names = FALSE, col.names = TRUE)
+```
+
+```{r Frequency of each Survey Response for Overall Natioanl Pride by Country}
+d$pride.overall.f <- recode(d$pride.overall,
+                            `0` = "Not proud at all",
+                            `33` = "Not very proud",
+                           `67` =  "Somewhat proud",
+                            `100` = "Very proud",
+                           .missing = "Missing") %>% 
+fct_relevel(., "Missing", after = Inf)
+
+# Create row-wise frequencies by factor-level by country excluding NAs
+tbl.op1 <- d %>% filter(pride.overall.f != "Missing") %>% 
+  count(country, pride.overall.f) %>%
+  group_by(country) %>%
+  mutate(prop = round(prop.table(n),2)) %>%
+  select(-n) %>%
+  pivot_wider(names_from = pride.overall.f, values_from = prop)
+
+# Create column-wise frequencies of NAs only
+tbl.op2 <- d %>% filter(pride.overall.f == "Missing") %>% 
+  group_by(country) %>%
+  summarise (n = n()) %>%
+  mutate(Missing = round(n / sum(n),2)) %>%
+  select(-n)
+
+# Bind row-wise frequencies of valid cases with frequencies of NAs
+tbl.op.c <- merge(tbl.op1, tbl.op2, by = "country")
+
+View(tbl.op.c)
+
+
+# write out tables for paper
+#write.table(tbl.op1, "/Users/ianscotnesbitt/Desktop/National Identity/Excel Files/Tables/Overall NP by Country.csv", sep = ",", row.names = FALSE, col.names = TRUE)
+write.table(tbl.op.c, "/Users/ianscotnesbitt/Desktop/National Identity/Excel Files/Tables/Overall NP by Country.csv", sep = ",", row.names = FALSE, col.names = TRUE)
+```
+
+```{r OLS Regression Model of Overall National Pride on Individual Criterion Variables}
+ols.np <- lm(pride.overall ~
+               education +
+               age +
+               sex +
+               citizenship +
+               attend.religious +
+               community,
+             data = d
+             )
+lm.beta(ols.np)
+summary(ols.np)
+```
+
+```{r Multilevel Regression Model of Overall National Pride on Individual and Contextual Criterion Variables}
+ml.np <- lmer(pride.overall ~
+                education +
+                age +
+                sex +
+                citizenship +
+                attend.religious +
+                community +
+                economic.system +
+                gdp.1k +
+                population +
+                (1|country),
+              data = d
+              )
+summary(ml.np)
+```
+
+```{r Multilevel Regression Models of Overall National Pride with Age*Ex-Communist Interaction}
+ml.np.int1 <- lmer(pride.overall ~
+                     education +
+                     age +
+                     sex +
+                     citizenship +
+                     attend.religious +
+                     community +
+                     economic.system +
+                     gdp.1k +
+                     population +
+                     economic.system*age +
+                     (1|country),
+                   data = d
+                  )
+
+ml.np.int2 <- lmer(pride.overall ~
+                     education +
+                     age +
+                     sex +
+                     citizenship +
+                     attend.religious +
+                     community +
+                     economic.system +
+                     gdp.1k +
+                     population +
+                     economic.system*age.born1989 +
+                    (1|country),
+                  data = d
+                  )
+
+ml.np.int3 <- lmer(pride.overall ~
+                     education +
+                     age +
+                     sex +
+                     citizenship +
+                     attend.religious +
+                     community +
+                     economic.system +
+                     gdp.1k +
+                     population +
+                    economic.system*age.adult1989 +
+                    (1|country),
+                  data = d
+                  )
+
+summary(ml.np.int1)
+summary(ml.np.int2)
+summary(ml.np.int3)
+```
+
+#INTERPRETATION: Significant interactions in all three models.
+
+```{r Overall National Pride Regression Table}
+stargazer(ols.np,
+          ml.np,
+          ml.np.int1,
+          ml.np.int2,
+          ml.np.int3,
+          title="Overall National Pride Regression Table",
+          dep.var.labels =c("Overall National Pride"),
+          covariate.labels=c("Education",
+                             "Age",
+                             "Male",
+                             "Non-Citizen",
+                             "Church Attendance",
+                             "Countryside",
+                             "Suburbs",
+                             "Town",
+                             "Village",
+                             "Market",
+                             "GDP per capita",
+                             "Population",
+                             "Market*Age",
+                             "Born before 1989",
+                             "Market*Born before 1989",
+                             "Adult before 1989",
+                             "Market*Adult before 1989"),
+          align = TRUE,
+          single.row = TRUE,
+          type = 'text')
+```
+
+```{r Age Ex-Communist on Overall National Pride Among People 18 to 75}
+# Continuous age variable.
+np.int.plot1 <- ggplot(data = d,
+                       aes(x = age.lessthan75,
+                           y = pride.overall,
+                           group = economic.system,
+                           color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Overall National Pride") +
+  theme(legend.title = element_blank())
+np.int.plot1
+
+# Categorical age variable, born before or after 1989.
+np.int.plot2 <- ggplot(data = subset(d, !is.na(age.born1989)),
+                       aes(x = age.born1989,
+                           y = pride.overall,
+                           group = economic.system,
+                           color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Overall National Pride") +
+  theme(legend.title = element_blank())
+np.int.plot2
+
+# Categorical age variable, adult before or after 1989.
+np.int.plot3 <- ggplot(data = subset(d, !is.na(age.adult1989)),
+                       aes(x = age.adult1989,
+                           y = pride.overall,
+                           group = economic.system,
+                           color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Overall National Pride") +
+  theme(legend.title = element_blank())
+np.int.plot3
+```
+
+```{r OLS Regression Model of Pride in Advancement on Individual Criterion Variables}
+ols.adv <- lm(pride.advancement ~
+               education +
+               age +
+               sex +
+               citizenship +
+               attend.religious +
+               community,
+              data = d
+              )
+lm.beta(ols.adv)
+summary(ols.adv)
+```
+
+```{r Multilevel Regression Model of Pride in Advancement on Individual and Contextual Criterion Variables}
+ml.adv <- lmer(pride.advancement ~
+                 education +
+                 age +
+                 sex +
+                 citizenship +
+                 attend.religious +
+                 community +
+                 economic.system +
+                 gdp.1k +
+                 population +
+                 (1|country),
+               data = d
+               )
+summary(ml.adv)
+```
+
+```{r Multilevel Regression Models of Pride in Advancement with Age*Ex-Communist Interaction}
+ml.adv.int1 <- lmer(pride.advancement ~
+                      education +
+                      age +
+                      sex +
+                      citizenship +
+                      attend.religious +
+                      community +
+                      economic.system +
+                      gdp.1k +
+                      population +
+                      economic.system*age +
+                      (1|country),
+                    data = d
+                    )
+summary(ml.adv.int1)
+
+ml.adv.int2 <- lmer(pride.advancement ~
+                       education +
+                       age +
+                       sex +
+                       citizenship +
+                       attend.religious +
+                       community +
+                       economic.system +
+                       gdp.1k +
+                       population +
+                       economic.system*age.born1989 +
+                       (1|country),
+                     data = d
+                     )
+summary(ml.adv.int2)
+
+ml.adv.int3 <- lmer(pride.advancement ~
+                       education +
+                       age +
+                       sex +
+                       citizenship +
+                       attend.religious +
+                       community +
+                       economic.system +
+                       gdp.1k +
+                       population +
+                       economic.system*age.adult1989 +
+                    (1|country),
+                  data = d
+                  )
+summary(ml.adv.int3)
+```
+#INTERPRETATION: Significant Interaction.
+```{r Pride in Advancement Regression Table}
+stargazer(ols.adv,
+          ml.adv,
+          ml.adv.int1,
+          ml.adv.int2,
+          ml.adv.int3,
+          title="Pride in Advancement Regression Table",
+          dep.var.labels =c("Pride in Advancement"),
+          covariate.labels=c("Education",
+                             "Age",
+                             "Male",
+                             "Non-Citizen",
+                             "Church Attendance",
+                             "Countryside",
+                             "Suburbs",
+                             "Town",
+                             "Village",
+                             "Market",
+                             "GDP per capita",
+                             "Population",
+                             "Market*Age",
+                             "Born before 1989",
+                             "Market*Born before 1989",
+                             "Adult before 1989",
+                             "Market*Adult before 1989"),
+          align = TRUE,
+          single.row = TRUE,
+          type = 'text')
+```
+
+```{r Age by Ex-Communist on Pride in Advancement Among People 18 to 75}
+adv.int.plot1 <- ggplot(data = d, aes(x = age.lessthan75,
+                                      y = pride.advancement,
+                                      group = economic.system,
+                                      color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Advancement National Pride") +
+  theme(legend.title = element_blank())
+adv.int.plot1
+
+adv.int.plot2 <- ggplot(data = subset(d, !is.na(age.born1989)),
+                         aes(x = age.born1989,
+                             y = pride.advancement,
+                             group = economic.system,
+                             color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Advancement National Pride") +
+  theme(legend.title = element_blank())
+adv.int.plot2
+
+adv.int.plot3 <- ggplot(data = subset(d, !is.na(age.adult1989)),
+                         aes(x = age.adult1989,
+                             y = pride.advancement,
+                             group = economic.system,
+                             color = economic.system)) +
+  geom_smooth(method = "lm") +
+  xlab("Age") +
+  ylab("Advancement National Pride") +
+  theme(legend.title = element_blank())
+adv.int.plot3
+```
+
+```{r OLS Regression Model of Pride in Leisure Activities on Individual Criterion Variables}
+ols.leis <- lm(pride.leisure ~
+                 education +
+                 age +
+                 sex +
+                 citizenship +
+                 attend.religious +
+                 community,
+               data = d
+               )
+lm.beta(ols.leis)
+summary(ols.leis)
+```
+
+```{r Multilevel Regression Model of Pride in Leisure Activities on Individual and Contextual Criterion Variables}
+ml.leis <- lmer(pride.leisure ~
+                  education +
+                  age +
+                  sex +
+                  citizenship +
+                  attend.religious +
+                  community +
+                  economic.system +
+                  gdp.1k +
+                  population +
+                  (1|country),
+                data = d
+                )
+summary(ml.leis)
+```
+
+```{r Multilevel Regression Model of The Components of Leisure Activities Scale on Individual and Contextual Criterion Variables}
+# Pride in sports
+ml.sport <- lmer(pride.sports ~
+                  education +
+                  age +
+                  sex +
+                  citizenship +
+                  attend.religious +
+                  community +
+                  economic.system +
+                  gdp.1k +
+                  population +
+                  (1|country),
+                data = d
+                )
+summary(ml.sport)
+
+#Pride in arts
+ml.art <- lmer(pride.arts ~
+                  education +
+                  age +
+                  sex +
+                  citizenship +
+                  attend.religious +
+                  community +
+                  economic.system +
+                  gdp.1k +
+                  population +
+                  (1|country),
+                data = d
+                )
+summary(ml.art)
+
+# Pride in international sports
+ml.intsport <- lmer(pride.internationalsports ~
+                      education +
+                      age +
+                      sex +
+                      citizenship +
+                      attend.religious +
+                      community +
+                      economic.system +
+                      gdp.1k +
+                      population +
+                      (1|country),
+                    data = d
+                )
+summary(ml.intsport)
+```
+#INTERPRETATION: We suspected that education might predict pride in sports differently than pride in arts, and these models confirm this. Education predicts lower pride in sports and higher pride in arts. I then regress pride in international sports on education and find the same pattern as with sports in general: education predicts lower pride.
+```{r Multilevel Regression Models of Pride in Leisure Activities with Age*Ex-Communist Interaction}
+ml.leis.int1 <- lmer(pride.leisure ~
+                     education +
+                       age +
+                       sex +
+                       citizenship +
+                       attend.religious +
+                       community +
+                       economic.system +
+                       gdp.1k +
+                       population +
+                       economic.system*age +
+                     (1|country),
+                   data = d
+                   )
+summary(ml.leis.int1)
+
+ml.leis.int2 <- lmer(pride.leisure ~
+                     education +
+                       age +
+                       sex +
+                       citizenship +
+                       attend.religious +
+                       community +
+                       economic.system +
+                       gdp.1k +
+                       population +
+                       economic.system*age.born1989 +
+                     (1|country),
+                  data = d
+                  )
+summary(ml.leis.int2)
+
+ml.leis.int3 <- lmer(pride.leisure ~
+                     education +
+                       age +
+                       sex +
+                       citizenship +
+                       attend.religious +
+                       community +
+                       economic.system +
+                       gdp.1k +
+                       population +
+                       economic.system*age.adult1989 +
+                     (1|country),
+                  data = d
+                  )
+summary(ml.leis.int3)
+```
+#INTERPRETATION: Non-significant Interaction. No need to plot the lines.
+```{r Pride in Leisure Activities Regression Table}
+stargazer(ols.leis,
+          ml.leis,
+          ml.leis.int1,
+          ml.leis.int2,
+          ml.leis.int3,
+          title="Pride in Leisure Activities",
+          dep.var.labels =c("Pride in Leisure Activites"),
+          covariate.labels=c("Education",
+                             "Age",
+                             "Male",
+                             "Non-Citizen",
+                             "Church Attendance",
+                             "Countryside",
+                             "Suburbs",
+                             "Town",
+                             "Village",
+                             "Market",
+                             "GDP per capita",
+                             "Population",
+                             "Market*Age",
+                             "Born before 1989",
+                             "Market*Born before 1989",
+                             "Adult before 1989",
+                             "Market*Adult before 1989"),
+          align = TRUE,
+          single.row = TRUE,
+          type = 'text')
+```
